@@ -39,7 +39,7 @@ jobs:
             /out "ScreenOCR.exe"
 
       - name: ZIP
-        run: 7z a -tzip ScreenOCR.zip ScreenOCR.exe ScreenOCR.ini bin lib
+        run: 7z a -tzip ScreenOCR.zip ScreenOCR.exe ScreenOCR.ini lib
 
       - name: Generate SHA256 checksums
         run: sha256sum ScreenOCR.zip > ScreenOCR.zip.sha256

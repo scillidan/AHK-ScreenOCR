@@ -1,0 +1,54 @@
+name: Create release
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install 7zip
+        run: |
+          choco install 7zip.install -y
+
+      - name: Install AutoHotkey v1
+        run: |
+          choco install autohotkey_l.install -y
+          echo "C:\Program Files\AutoHotkey\Compiler" >> $GITHUB_PATH
+
+      - name: Compile AHK to EXE
+        run: |
+          & "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" `
+            /in "ScreenOCR.ahk" `
+            /icon "assets/icon.ico" `
+            /out "ScreenOCR.exe"
+
+      - name: ZIP
+        run: 7z a -tzip ScreenOCR.zip ScreenOCR.exe ScreenOCR.ini bin lib
+
+      - name: Generate SHA256 checksums
+        run: sha256sum ScreenOCR.zip > ScreenOCR.zip.sha256
+
+      - name: Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            ScreenOCR.zip

@@ -143,7 +143,7 @@ class Vis2 {
                      Vis2.obj.database := Vis2.obj.provider.getText()
                   }
                } catch e {
-                  ShowNotification("AHK-ScreenOCR Error", e.message)
+                  ShowNotification("ScreenOCR Error", e.message)
                   Vis2.obj.EXITCODE := -1
                }
 
@@ -184,7 +184,7 @@ class Vis2 {
                             prefix := "[" . Vis2.cfg.usedEngine . " - " . Vis2.cfg.usedLang . "] "
                          else
                             prefix := "[" . Vis2.cfg.usedLang . "] "
-                         ShowNotification("AHK-ScreenOCR", prefix . text)
+                         ShowNotification("ScreenOCR", prefix . text)
                      }
                   }
                   Vis2.obj.EXITCODE := 1

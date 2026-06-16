@@ -160,7 +160,7 @@ BuildTessLangStr(langArr) {
 
 ShowNotification(title, msg) {
     if (Vis2.cfg.notifyMethod = "snoretoast") {
-        Run, % "snoretoast -t """ . title . """ -m """ . msg . """ -silent",, Hide
+        Run, % "snoretoast -t """ . title . """ -m """ . msg . """ -silent -p """ . A_ScriptDir . "\assets\icon_128.png""",, Hide
     } else {
         TrayTip, %title%, %msg%, 2
     }
@@ -168,7 +168,7 @@ ShowNotification(title, msg) {
 
 UpdateTrayTip() {
     global ocrHotkey, tHotkey, rHotkey, tessEnabled, rapidEnabled, langHotkeys
-    tip := "AHK-ScreenOCR"
+    tip := "ScreenOCR"
     if (ocrHotkey != "")
         tip .= "`nGlobal: " . ocrHotkey
     if (tessEnabled && tHotkey != "")
@@ -212,7 +212,7 @@ CheckLangs:
             FileAppend, %cleanTess%, %tessCachePath%
         tessResult := cleanTess
     }
-    ShowNotification("AHK-ScreenOCR", "Checking languages... Tesseract syncing, RapidOCR loading.")
+    ShowNotification("ScreenOCR", "Checking languages... Tesseract syncing, RapidOCR loading.")
     tmpOut := A_Temp . "\ahk_ocrs_langs.txt"
     tmpErr := A_Temp . "\ahk_ocrs_langs_err.txt"
     Run, % ComSpec . " /C uv run lib\rapidocr_cli.py --list-langs > """ . tmpOut . """ 2> """ . tmpErr . """",, Hide, ocrPid
@@ -268,12 +268,12 @@ CheckLangsProgress:
         if (StrLen(rapidShort) > 50)
             rapidShort := SubStr(rapidShort, 1, 47) . "..."
         msg := tessShort . "`n" . rapidShort
-        ShowNotification("AHK-ScreenOCR", msg)
+        ShowNotification("ScreenOCR", msg)
     }
     ocrChecking := false
     Menu, Tray, Enable, Check Languages
     SetTimer, CheckLangsProgress, Off
-    MsgBox, 0x24, AHK-ScreenOCR, Language lists saved. Open folder to view?
+    MsgBox, 0x24, ScreenOCR, Language lists saved. Open folder to view?
     IfMsgBox Yes
         Run, explore %scriptDir%\cache
 return
@@ -292,7 +292,7 @@ CheckLangsFail:
         if (StrLen(tessShort) > 50)
             tessShort := SubStr(tessShort, 1, 47) . "..."
         msg := tessShort . "`nRapidOCR: failed (see README)"
-        ShowNotification("AHK-ScreenOCR", msg)
+        ShowNotification("ScreenOCR", msg)
     }
     ocrChecking := false
     Menu, Tray, Enable, Check Languages

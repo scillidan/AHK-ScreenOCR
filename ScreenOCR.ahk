@@ -1,11 +1,10 @@
-﻿; ScreenOCR - Screen OCR with Tesseract and RapidOCR
+﻿; ScreenOCR - Screen OCR with RapidOCR (PaddleOCR ONNX, PP-OCRv5)
 ; License: MIT (c) scillidan
 ;
 ; Third-party libraries:
 ;   lib/OCR.ahk      - Based on Vis2.ahk by Edison Hua (iseahound), Custom license
 ;                      https://github.com/iseahound/Vis2
-;                      Modified: Removed ImageIdentify, Google Vision provider,
-;                      added RapidOCR provider, fallback engine logic,
+;                      Modified: Removed ImageIdentify, Google Vision, Tesseract,
 ;                      simplified UX, added notification/config hooks
 ;   lib/ImagePut.ahk - MIT License, (c) Edison Hua (iseahound)
 ;                      https://github.com/iseahound/ImagePut
@@ -27,46 +26,21 @@ IniRead, notifyMethod, %iniPath%, OCR, NotificationMethod, traytip
 IniRead, notify, %iniPath%, OCR, Notify, 1
 IniRead, screenshotTool, %iniPath%, OCR, ScreenshotTool, builtin
 
-IniRead, tHotkey, %iniPath%, Tesseract, Hotkey,
-IniRead, tLangsRaw, %iniPath%, Tesseract, Languages, eng
-IniRead, tessdata, %iniPath%, Tesseract, Tessdata,
-
 IniRead, rHotkey, %iniPath%, RapidOCR, Hotkey,
 IniRead, rLangsRaw, %iniPath%, RapidOCR, Languages, ch
 
 IniRead, recogMsg, %iniPath%, NotifyMessages, RecogMsg, Recognizing...
 IniRead, noTextMsg, %iniPath%, NotifyMessages, NoTextMsg, No text found
 
-tessLangs := ParseLangList(tLangsRaw)
 rapidLangs := ParseLangList(rLangsRaw)
 
-tessEnabled := tessLangs.Length() > 0
 rapidEnabled := rapidLangs.Length() > 0
-
-tessLang := ""
-if (tessEnabled)
-    tessLang := BuildTessLangStr(tessLangs)
 
 rapidLang := ""
 if (rapidEnabled)
     rapidLang := rapidLangs[1]
 
 langHotkeys := []
-IniRead, tessLangSection, %iniPath%, TesseractLangHotkey
-if (tessLangSection != "ERROR") {
-    Loop, Parse, tessLangSection, `n, `r
-    {
-        if (A_LoopField == "")
-            continue
-        colonPos := InStr(A_LoopField, ":")
-        if (!colonPos)
-            continue
-        lang := Trim(SubStr(A_LoopField, 1, colonPos - 1))
-        hk := Trim(SubStr(A_LoopField, colonPos + 1))
-        if (lang != "" && hk != "")
-            langHotkeys.Push({lang: lang, hk: hk, engine: "tesseract"})
-    }
-}
 IniRead, rapidLangSection, %iniPath%, RapidOCRLangHotkey
 if (rapidLangSection != "ERROR") {
     Loop, Parse, rapidLangSection, `n, `r
@@ -83,8 +57,8 @@ if (rapidLangSection != "ERROR") {
     }
 }
 
-if (!tessEnabled && !rapidEnabled) {
-    MsgBox, 0x10, Error, No languages configured. Check [Tesseract] and [RapidOCR] Languages.
+if (!rapidEnabled) {
+    MsgBox, 0x10, Error, No languages configured. Check [RapidOCR] Languages.
     ExitApp
 }
 
@@ -99,12 +73,8 @@ Vis2.cfg.recogMsg := recogMsg
 Vis2.cfg.noTextMsg := noTextMsg
 Vis2.cfg.notifyMethod := notifyMethod
 Vis2.cfg.notify := notify
-Vis2.cfg.tessLangs := tessLangs
 Vis2.cfg.rapidLangs := rapidLangs
-Vis2.cfg.tessdata := tessdata
-Vis2.cfg.tessLang := tessLang
 Vis2.cfg.rapidLang := rapidLang
-Vis2.cfg.tessEnabled := tessEnabled
 Vis2.cfg.rapidEnabled := rapidEnabled
 
 shortcutPath := A_StartMenu . "\Programs\Startup\ScreenOCR.lnk"
@@ -112,8 +82,6 @@ isStartup := FileExist(shortcutPath)
 
 if (ocrHotkey != "")
     Hotkey, %ocrHotkey%, GlobalAutoOCR
-if (tessEnabled && tHotkey != "")
-    Hotkey, %tHotkey%, TesseractOCR
 if (rapidEnabled && rHotkey != "")
     Hotkey, %rHotkey%, RapidOCROCR
 for i, entry in langHotkeys {
@@ -151,13 +119,6 @@ ParseLangList(str) {
     return arr
 }
 
-BuildTessLangStr(langArr) {
-    result := ""
-    for i, lang in langArr
-        result .= (result ? "+" : "") . lang
-    return result
-}
-
 ShowNotification(title, msg) {
     if (Vis2.cfg.notifyMethod = "snoretoast") {
         Run, % "snoretoast -t """ . title . """ -m """ . msg . """ -silent -p """ . A_ScriptDir . "\assets\icon_128.png""",, Hide
@@ -167,12 +128,10 @@ ShowNotification(title, msg) {
 }
 
 UpdateTrayTip() {
-    global ocrHotkey, tHotkey, rHotkey, tessEnabled, rapidEnabled, langHotkeys
+    global ocrHotkey, rHotkey, rapidEnabled, langHotkeys
     tip := "ScreenOCR"
     if (ocrHotkey != "")
         tip .= "`nGlobal: " . ocrHotkey
-    if (tessEnabled && tHotkey != "")
-        tip .= "`nTesseract: " . tHotkey
     if (rapidEnabled && rHotkey != "")
         tip .= "`nRapidOCR: " . rHotkey
     if (langHotkeys.Length() > 0) {
@@ -192,27 +151,8 @@ CheckLangs:
         return
     ocrChecking := true
     Menu, Tray, Disable, Check Languages
-    tessCachePath := scriptDir . "\cache\tesseract_lang.txt"
     rapidCachePath := scriptDir . "\cache\rapidocr_lang.txt"
-    tessResult := ""
-    tessOut := A_Temp . "\ahk_ocrs_tess.txt"
-    RunWait, % ComSpec . " /C tesseract --list-langs 2>nul > """ . tessOut . """",, Hide
-    if (FileExist(tessOut)) {
-        FileRead, tessRaw, %tessOut%
-        FileDelete, %tessOut%
-        tessLangsList := StrSplit(Trim(tessRaw, "`r`n "), "`n", "`r")
-        cleanTess := ""
-        for i, line in tessLangsList {
-            tl := Trim(line)
-            if (tl != "" && tl != "List of available languages in" && !RegExMatch(tl, "^\("))
-                cleanTess .= (cleanTess ? ", " : "") . tl
-        }
-        FileDelete, %tessCachePath%
-        if (cleanTess != "")
-            FileAppend, %cleanTess%, %tessCachePath%
-        tessResult := cleanTess
-    }
-    ShowNotification("ScreenOCR", "Checking languages... Tesseract syncing, RapidOCR loading.")
+    ShowNotification("ScreenOCR", "Checking languages... RapidOCR loading.")
     tmpOut := A_Temp . "\ahk_ocrs_langs.txt"
     tmpErr := A_Temp . "\ahk_ocrs_langs_err.txt"
     Run, % ComSpec . " /C uv run lib\rapidocr_cli.py --list-langs > """ . tmpOut . """ 2> """ . tmpErr . """",, Hide, ocrPid
@@ -255,19 +195,13 @@ CheckLangsProgress:
     if (clean != "")
         FileAppend, %clean%, %rapidCachePath%
     if (Vis2.cfg.notify) {
-        if (tessResult)
-            tessShort := "Tesseract: " . tessResult
-        else
-            tessShort := "Tesseract: none"
         if (clean)
             rapidShort := "RapidOCR: " . clean
         else
             rapidShort := "RapidOCR: none"
-        if (StrLen(tessShort) > 50)
-            tessShort := SubStr(tessShort, 1, 47) . "..."
         if (StrLen(rapidShort) > 50)
             rapidShort := SubStr(rapidShort, 1, 47) . "..."
-        msg := tessShort . "`n" . rapidShort
+        msg := rapidShort
         ShowNotification("ScreenOCR", msg)
     }
     ocrChecking := false
@@ -285,13 +219,7 @@ CheckLangsFail:
     if (FileExist(tmpErr))
         FileDelete, %tmpErr%
     if (Vis2.cfg.notify) {
-        if (tessResult)
-            tessShort := "Tesseract: " . tessResult
-        else
-            tessShort := "Tesseract: none"
-        if (StrLen(tessShort) > 50)
-            tessShort := SubStr(tessShort, 1, 47) . "..."
-        msg := tessShort . "`nRapidOCR: failed (see README)"
+        msg := "RapidOCR: failed (see README)"
         ShowNotification("ScreenOCR", msg)
     }
     ocrChecking := false
@@ -300,30 +228,8 @@ return
 
 GlobalAutoOCR:
     Vis2.cfg.mode := "global"
-    if (tessEnabled && rapidEnabled) {
-        Vis2.cfg.currentEngine := "tesseract"
-        Vis2.cfg.currentLang := Vis2.cfg.tessLang
-    } else if (tessEnabled) {
-        Vis2.cfg.currentEngine := "tesseract"
-        Vis2.cfg.currentLang := Vis2.cfg.tessLang
-    } else {
-        Vis2.cfg.currentEngine := "rapidocr"
-        Vis2.cfg.currentLang := Vis2.cfg.rapidLang
-    }
-    if (screenshotTool = "flameshot") {
-        RunWait, flameshot gui,, Hide
-        OCR("clipboard", Vis2.cfg.currentLang)
-    } else {
-        OCR(, Vis2.cfg.currentLang)
-    }
-return
-
-TesseractOCR:
-    if (!tessEnabled)
-        return
-    Vis2.cfg.mode := "tesseract"
-    Vis2.cfg.currentEngine := "tesseract"
-    Vis2.cfg.currentLang := Vis2.cfg.tessLang
+    Vis2.cfg.currentEngine := "rapidocr"
+    Vis2.cfg.currentLang := Vis2.cfg.rapidLang
     if (screenshotTool = "flameshot") {
         RunWait, flameshot gui,, Hide
         OCR("clipboard", Vis2.cfg.currentLang)
@@ -347,8 +253,6 @@ RapidOCROCR:
 return
 
 DirectOCR(lang, engine) {
-    if (engine = "tesseract" && !tessEnabled)
-        return
     if (engine = "rapidocr" && !rapidEnabled)
         return
     Vis2.cfg.mode := engine

@@ -24,12 +24,7 @@ class Vis2 {
        }
 
       _pickProvider(language:=""){
-         if (!IsObject(Vis2.cfg))
-            return Vis2.provider.Tesseract
-         engine := Vis2.cfg.currentEngine
-         if (engine = "rapidocr")
-            return Vis2.provider.RapidOCR
-         return Vis2.provider.Tesseract
+         return Vis2.provider.RapidOCR
       }
    }
 
@@ -136,40 +131,15 @@ class Vis2 {
 
                if (Vis2.cfg.recogMsg)
                   TrayTip, AHK-ScreenOCR, % Vis2.cfg.recogMsg, 3
-               try {
-                  if (coordinates) {
-                     Vis2.obj.provider.preprocess()
-                     Vis2.obj.provider.convert()
-                     Vis2.obj.database := Vis2.obj.provider.getText()
-                  }
-               } catch e {
-                  ShowNotification("ScreenOCR Error", e.message)
-                  Vis2.obj.EXITCODE := -1
-               }
-
-                if (Vis2.obj.database = "" && Vis2.obj.EXITCODE == 0 && Vis2.cfg.mode = "global" && coordinates) {
-                    fallbackEngine := ""
-                    if (Vis2.cfg.currentEngine = "tesseract" && Vis2.cfg.rapidEnabled)
-                        fallbackEngine := "rapidocr"
-                    else if (Vis2.cfg.currentEngine = "rapidocr" && Vis2.cfg.tessEnabled)
-                        fallbackEngine := "tesseract"
-                    if (fallbackEngine != "") {
-                        fallbackLang := (fallbackEngine = "tesseract") ? Vis2.cfg.tessLang : Vis2.cfg.rapidLang
-                        fallbackClass := (fallbackEngine = "tesseract") ? Vis2.provider.Tesseract : Vis2.provider.RapidOCR
-                        fallbackProv := new fallbackClass(fallbackLang)
-                        try {
-                            pBitmap := Gdip_CreateBitmapFromFile(Vis2.obj.provider.file)
-                            ImagePutFile({bitmap: pBitmap}, fallbackProv.file, fallbackProv.jpegQuality)
-                            Gdip_DisposeImage(pBitmap)
-                            fallbackProv.preprocess()
-                            fallbackProv.convert()
-                            Vis2.obj.database := fallbackProv.getText()
-                            Vis2.cfg.usedEngine := fallbackEngine
-                            Vis2.cfg.usedLang := fallbackLang
-                        } catch e2 {
-                        }
-                        fallbackProv.cleanup()
-                    }
+                try {
+                   if (coordinates) {
+                      Vis2.obj.provider.preprocess()
+                      Vis2.obj.provider.convert()
+                      Vis2.obj.database := Vis2.obj.provider.getText()
+                   }
+                } catch e {
+                   ShowNotification("ScreenOCR Error", e.message)
+                   Vis2.obj.EXITCODE := -1
                 }
 
                if (Vis2.obj.database != "" && Vis2.obj.EXITCODE == 0) {
@@ -221,7 +191,7 @@ class Vis2 {
                 }
              }
 
-             Vis2.obj.provider.cleanup()
+              Vis2.obj.provider.cleanup()
              Vis2.obj := ""
              Vis2.Graphics.Shutdown()
           }
@@ -457,144 +427,9 @@ class Vis2 {
        }
      }
 
-    class provider {
+     class provider {
 
-        class Tesseract {
-           static slowProvider := false
-           static leptonica := "leptonica_util"
-           static tesseract := "tesseract"
-           static tessdata := ""
-
-           uuid := Vis2.stdlib.CreateUUID()
-           file := A_Temp "\Vis2_screenshot" this.uuid ".bmp"
-           fileProcessedImage := A_Temp "\Vis2_preprocess" this.uuid ".tif"
-           fileConvertedText := A_Temp "\Vis2_text" this.uuid ".txt"
-
-           __New(language:=""){
-              this.language := language
-              if (IsObject(Vis2.cfg) && Vis2.cfg.tessdata != "") {
-                 Vis2.provider.Tesseract.tessdata := Vis2.cfg.tessdata
-              } else {
-                 EnvGet, tessPrefix, TESSDATA_PREFIX
-                 if (tessPrefix != "")
-                    Vis2.provider.Tesseract.tessdata := tessPrefix
-              }
-           }
-
-           OCR(image, language:="", options:=""){
-              this.language := language
-              try {
-                 screenshot := ImagePutFile({image: image, crop: options}, this.file)
-                 this.preprocess(screenshot, this.fileProcessedImage)
-                 this.convert_best(this.fileProcessedImage, this.fileConvertedText)
-                 text := this.getText(this.fileConvertedText)
-              } catch e {
-                 MsgBox, 16,, % "Exception thrown!`n`nwhat: " e.what "`nfile: " e.file
-                    . "`nline: " e.line "`nmessage: " e.message "`nextra: " e.extra
-              }
-              finally {
-                 this.cleanup()
-                 text.base.google := ObjBindMethod(Vis2.Text, "google")
-                 text.base.clipboard := ObjBindMethod(Vis2.Text, "clipboard")
-              }
-              return text
-           }
-
-           cleanup(){
-              FileDelete, % this.file
-              FileDelete, % this.fileProcessedImage
-              FileDelete, % this.fileConvertedText
-           }
-
-           convert(in:="", out:=""){
-              in := (in) ? in : this.fileProcessedImage
-              out := (out) ? out : this.fileConvertedText
-
-              if !(FileExist(in))
-                 throw Exception("Input image for conversion not found.",, in)
-
-              static q := Chr(0x22)
-              _cmd .= q this.tesseract q
-              if (this.tessdata != "")
-                 _cmd .= " --tessdata-dir " q this.tessdata q
-              _cmd .= " " q in q " " q SubStr(out, 1, -4) q
-              _cmd .= (this.language) ? " -l " q this.language q : ""
-              _cmd := ComSpec " /C " q _cmd q
-              RunWait % _cmd,, Hide
-
-              if !(FileExist(out))
-                 throw Exception("Tesseract failed.",, _cmd)
-
-              return out
-           }
-
-           convert_best(in:="", out:=""){
-              return this.convert(in, out)
-           }
-
-           convert_fast(in:="", out:=""){
-              return this.convert(in, out)
-           }
-
-           getPreprocessImage(){
-              return this.fileProcessedImage
-           }
-
-           getText(in:="", lines:=""){
-              in := (in) ? in : this.fileConvertedText
-
-              if !(database := FileOpen(in, "r`n", "UTF-8"))
-                 throw Exception("Text file could not be found or opened.",, in)
-
-              if (lines == "") {
-                 text := RegExReplace(database.Read(), "^\s*(.*?)\s*$", "$1")
-                 text := RegExReplace(text, "(?<!\r)\n", "`r`n")
-              } else {
-                 while (lines > 0) {
-                    data := database.ReadLine()
-                    data := RegExReplace(data, "^\s*(.*?)\s*$", "$1")
-                    if (data != "") {
-                       text .= (text) ? ("`n" . data) : data
-                       lines--
-                    }
-                    if (!database || database.AtEOF)
-                       break
-                 }
-              }
-              database.Close()
-              return text
-           }
-
-           getTextLines(lines){
-              return this.read(, lines)
-           }
-
-           preprocess(in:="", out:=""){
-              static ocrPreProcessing := 1
-              static negateArg := 2
-              static performScaleArg := 1
-              static scaleFactor := 3.5
-
-              in := (in != "") ? in : this.file
-              out := (out != "") ? out : this.fileProcessedImage
-
-              if !(FileExist(in))
-                 throw Exception("Input image for preprocessing not found.",, in)
-
-              static q := Chr(0x22)
-              _cmd .= q this.leptonica q " " q in q " " q out q
-              _cmd .= " " negateArg " 0.5 " performScaleArg " " scaleFactor " " ocrPreProcessing " 5 2.5 " ocrPreProcessing  " 2000 2000 0 0 0.0"
-              _cmd := ComSpec " /C " q _cmd q
-              RunWait, % _cmd,, Hide
-
-              if !(FileExist(out))
-                 throw Exception("Preprocessing failed.",, _cmd)
-
-              return out
-           }
-        }
-
-       class RapidOCR {
+        class RapidOCR {
           static slowProvider := true
           static useAngleCls := 1
           static python := "uv run"

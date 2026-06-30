@@ -6,7 +6,7 @@
 
 Screen OCR with [RapidOCR](https://github.com/RapidAI/RapidOCR) (PaddleOCR ONNX, PP-OCRv5). Edit `ScreenOCR.ini` to configure.
 
-Authors: GLM-5.1🧙‍♂️, scillidan🤡
+Authors: GLM-5.1🧙‍♂️, DeepSeek-V4-Pro, scillidan🤡
 
 The icon is from [SimpleKeys](https://beamedeighth.itch.io/simplekeys-animated-pixel-keyboard-keys) by [beamedeighth](https://beamedeighth.itch.io/).
 

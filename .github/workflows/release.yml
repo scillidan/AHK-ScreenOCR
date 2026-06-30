@@ -41,7 +41,7 @@ jobs:
             /out "ScreenOCR.exe"
 
       - name: ZIP
-        run: 7z a -tzip ScreenOCR.zip ScreenOCR.exe ScreenOCR.ini lib
+        run: 7z a -tzip ScreenOCR.zip ScreenOCR.exe ScreenOCR.ini lib README.md LICENSE
 
       - name: Generate SHA256 checksums
         run: sha256sum ScreenOCR.zip > ScreenOCR.zip.sha256

@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v6
+        with:
+          persist-credentials: false
+
+      - name: Install 7zip
+        run: |
+          choco install 7zip.install -y
+
+      - name: Install AutoHotkey v1
+        run: |
+          choco install autohotkey_l.install -y
+          echo "C:\Program Files\AutoHotkey\Compiler" >> $GITHUB_PATH
+
+      - name: Compile AHK to EXE
+        run: |
+          & "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe" `
+            /in "ScreenOCR.ahk" `
+            /icon "assets/icon.ico" `
+            /out "ScreenOCR.exe"
+
+      - name: ZIP
+        run: 7z a -tzip ScreenOCR.zip ScreenOCR.exe ScreenOCR.ini lib
+
+      - name: Generate SHA256 checksums
+        run: sha256sum ScreenOCR.zip > ScreenOCR.zip.sha256
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          gh release create "$env:TAG_NAME" `
+            ScreenOCR.zip `
+            ScreenOCR.zip.sha256 `
+            --title "$env:TAG_NAME" `
+            --generate-notes

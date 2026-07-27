@@ -17,7 +17,16 @@ The icon is from [SimpleKeys](https://beamedeighth.itch.io/simplekeys-animated-p
 - [snoretoast](https://github.com/KDE/snoretoast) (Optional)
 - [flameshot](https://github.com/flameshot-org/flameshot) (Optional)
 
-## Usage
+## Install
+
+```sh
+scoop bucket add pile https://github.com/scillidan/scoop-pile
+scoop install pile/screen-ocr
+```
+
+When starting for the first time, you need to wait for `uv` install dependencies.
+
+## Testing
 
 1. Pre-install RapidOCR: `uv run lib\rapidocr_cli.py --list-langs`
 2. Test RapidOCR: `uv run lib\rapidocr_cli.py cache\testit.jpg cache\testit.txt ch`

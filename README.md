@@ -4,6 +4,9 @@
 
 # AHK-ScreenOCR
 
+> This repository is archived and kept for historical reference only.  
+> I'm currently using **[desktop-tools](https://github.com/scillidan/desktop-tools)** instead, which replaces and includes this project.
+
 Screen OCR with [RapidOCR](https://github.com/RapidAI/RapidOCR) (PaddleOCR ONNX, PP-OCRv5). Edit `ScreenOCR.ini` to configure.
 
 Authors: GLM-5.1🧙‍♂️, DeepSeek-V4-Pro🧙‍♂️, scillidan🤡
